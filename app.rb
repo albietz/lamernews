@@ -1116,6 +1116,14 @@ def get_news_by_id(news_ids,opt={})
         n["username"] = usernames[i]
     }
 
+    upvoters = result.map {|n|
+        $r.zrevrange("news.up:#{n["id"]}", 0, 3).map {|uid| $r.hget("user:#{uid}", "username") }
+    }
+
+    result.each_with_index {|n, i|
+        n["upvoters"] = upvoters[i]
+    }
+
     # Load $User vote information if we are in the context of a
     # registered user.
     if $user
@@ -1427,7 +1435,13 @@ def news_to_html(news)
             "&#9660;"
         }+
         H.p {
-            "#{news["up"]} up and #{news["down"]} down, posted by "+
+            "#{news["up"]} up"+
+            (news["upvoters"].length > 1 ? (" ("+news["upvoters"].map {|u|
+                H.a(:href=>"/user/"+H.urlencode(u)) {
+                    H.entities u
+                }
+            }.join(', ')+")") : "")+
+            " and #{news["down"]} down, posted by "+
             H.username {
                 H.a(:href=>"/user/"+H.urlencode(news["username"])) {
                     H.entities news["username"]
