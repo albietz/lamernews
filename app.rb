@@ -36,6 +36,8 @@ require 'digest/sha1'
 require 'digest/md5'
 require 'comments'
 require 'pbkdf2'
+require 'twitter_config'
+require 'twitter'
 require 'openssl' if UseOpenSSL
 
 Version = "0.9.3"
@@ -63,6 +65,13 @@ before do
     $user = nil
     auth_user(request.cookies['auth'])
     increment_karma_if_needed if $user
+
+    Twitter.configure do |config|
+      config.consumer_key = TwitterConsumerKey
+      config.consumer_secret = TwitterConsumerSecret
+      config.oauth_token = TwitterOAuthToken
+      config.oauth_token_secret = TwitterOAuthTokenSecret
+    end
 end
 
 get '/' do
@@ -1295,6 +1304,12 @@ def insert_news(title,url,text,user_id)
     $r.setex("url:"+url,PreventRepostTime,news_id) if !textpost
     # Set a timeout indicating when the user may post again
     $r.setex("user:#{$user['id']}:submitted_recently",NewsSubmissionBreak,'1')
+    # Tweet the new post
+    title = title.length > 115 ? title[0..115] + '...' : title
+    t = Thread.new {
+      Twitter.update(title + " http://minefeed.herokuapp.com/news/#{news_id}")
+    }
+    t.run
     return news_id
 end
 
